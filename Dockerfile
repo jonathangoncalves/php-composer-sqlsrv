@@ -37,6 +37,9 @@ RUN set -xe \
         $PHPIZE_DEPS \
         unixodbc-dev \
         freetds-dev \
+        libstdc++ \
+        gcc \
+        g++ \
     && docker-php-source extract \
     && docker-php-ext-install pdo_dblib \
     && pecl install \
