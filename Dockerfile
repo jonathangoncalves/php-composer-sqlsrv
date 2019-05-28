@@ -1,24 +1,50 @@
-# Composer Docker Container
-FROM prooph/composer:7.1
+FROM microsoft/mssql-tools as mssql
+FROM php:7.1-zts-alpine
 
-ENV ACCEPT_EULA=Y
+########### START Composer Instalation ###################
 
-# Microsoft SQL Server Prerequisites
-RUN apt-get update \
-    && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-    && curl https://packages.microsoft.com/config/debian/9/prod.list \
-        > /etc/apt/sources.list.d/mssql-release.list \
-    && apt-get install -y --no-install-recommends \
-        locales \
-        apt-transport-https \
-    && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
-    && locale-gen \
-    && apt-get update \
-    && apt-get -y --no-install-recommends install \
+# Environmental Variables
+ENV COMPOSER_HOME /root/composer
+ENV COMPOSER_VERSION master
+ENV COMPOSER_ALLOW_SUPERUSER 1
+RUN set -xe \
+    && apk add --no-cache --virtual .persistent-deps \
+        zlib-dev \
+        libzip-dev \
+        git \
+        unzip \
+    && docker-php-ext-install \
+        zip \
+    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
+    && composer global require hirak/prestissimo
+# Set up the command arguments
+CMD ["-"]
+ENTRYPOINT ["composer", "--ansi"]
+
+########### END Composer Instalation ###################
+
+########### START sqlsrv Instalation ###################
+
+COPY --from=mssql /opt/microsoft/ /opt/microsoft/
+COPY --from=mssql /opt/mssql-tools/ /opt/mssql-tools/
+COPY --from=mssql /usr/lib/libmsodbcsql-13.so /usr/lib/libmsodbcsql-13.so
+
+RUN set -xe \
+    && apk add --no-cache --virtual .persistent-deps \
+        freetds \
+        unixodbc \
+    && apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
         unixodbc-dev \
-        msodbcsql17
-
-RUN docker-php-ext-install mbstring pdo pdo_mysql \
-    && pecl install sqlsrv pdo_sqlsrv xdebug \
-    && docker-php-ext-enable sqlsrv pdo_sqlsrv xdebug
-
+        freetds-dev \
+    && docker-php-source extract \
+    && docker-php-ext-install pdo_dblib \
+    && pecl install \
+        sqlsrv \
+        pdo_sqlsrv \
+    && docker-php-ext-enable --ini-name 30-sqlsrv.ini sqlsrv \
+    && docker-php-ext-enable --ini-name 35-pdo_sqlsrv.ini pdo_sqlsrv \
+    && docker-php-source delete \
+    && apk del .build-deps
+    
+    ########### END sqlsrv Instalation ###################
