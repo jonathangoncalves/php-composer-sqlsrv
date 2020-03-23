@@ -26,6 +26,7 @@ RUN apt-get update \
      libmcrypt-dev \
      libzip-dev \
      zip \
+     git \
  && rm -rf /var/lib/apt/lists/* \
  && docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/ \
  && docker-php-ext-configure mcrypt --with-mcrypt \
